@@ -1,5 +1,6 @@
 import os from 'os';
 import matter from 'gray-matter';
+import { getUserFullName, resolveDate } from '../utils';
 
 export type Meta = {
 	author: string;
@@ -14,7 +15,7 @@ export type Model = {
 };
 
 function defaultAuthor(): string {
-	return os.userInfo().username;
+	return getUserFullName() || os.userInfo().username;
 }
 
 function defaultDate(): string {
@@ -27,7 +28,7 @@ export function parseMeta(fileContent: string): Model {
 	return {
 		data: {
 			author: data.author ?? defaultAuthor(),
-			date: data.date ?? defaultDate(),
+			date: data.date ? resolveDate(data.date) : defaultDate(),
 			paging: data.paging ?? 'Slide %d / %d',
 			theme: data.theme ?? 'default',
 		},
