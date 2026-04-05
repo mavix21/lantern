@@ -8,6 +8,9 @@
 		"type": "git",
 		"url": "git+https://github.com/mavix21/lantern.git"
 	},
+	"bin": {
+		"lantern": "./dist/cli.js"
+	},
 	"files": [
 		"dist"
 	],
@@ -33,5 +36,14 @@
 		"typescript": {
 			"optional": true
 		}
+	},
+	"dependencies": {
+		"ink": "^6.8.0",
+		"react": "^19.2.0",
+		"yargs": "^18.0.0"
+	},
+	"devDependencies": {
+		"@types/react": "^19.2.0",
+		"@types/yargs": "^17.0.35"
 	}
 }

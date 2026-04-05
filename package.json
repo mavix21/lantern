@@ -16,6 +16,7 @@
 	"type": "module",
 	"scripts": {
 		"build": "bunup",
+		"postbuild": "chmod +x packages/lantern/dist/cli.js",
 		"dev": "bunup --watch",
 		"format": "oxfmt",
 		"lint": "oxlint",
@@ -34,6 +35,9 @@
 		"oxlint": "^1.58.0",
 		"simple-git-hooks": "^2.13.1",
 		"typescript": "^6.0.2"
+	},
+	"overrides": {
+		"react": "^19.2.0"
 	},
 	"simple-git-hooks": {
 		"pre-commit": "bun run lint && bun run type-check"
