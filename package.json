@@ -1,0 +1,41 @@
+{
+	"name": "lantern-monorepo",
+	"private": true,
+	"homepage": "https://github.com/mavix21/lantern#readme",
+	"bugs": {
+		"url": "https://github.com/mavix21/lantern/issues"
+	},
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/mavix21/lantern.git"
+	},
+	"workspaces": [
+		"packages/*"
+	],
+	"type": "module",
+	"scripts": {
+		"build": "bunup",
+		"dev": "bunup --watch",
+		"format": "oxfmt",
+		"lint": "oxlint",
+		"prepare": "bun simple-git-hooks",
+		"release": "bumpp -r --commit --push --tag",
+		"test": "bun test",
+		"test:coverage": "bun test --coverage",
+		"test:watch": "bun test --watch",
+		"type-check": "bun run --filter '*' type-check"
+	},
+	"devDependencies": {
+		"@types/bun": "^1.3.11",
+		"bumpp": "^11.0.1",
+		"bunup": "^0.16.31",
+		"oxfmt": "^0.43.0",
+		"oxlint": "^1.58.0",
+		"simple-git-hooks": "^2.13.1",
+		"typescript": "^6.0.2"
+	},
+	"simple-git-hooks": {
+		"pre-commit": "bun run lint && bun run type-check"
+	}
+}
