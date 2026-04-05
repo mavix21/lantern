@@ -20,10 +20,23 @@ export const useNavigation = ({
 		if (input === 'q') {
 			exit();
 		}
-		if (key.rightArrow || input === 'l') {
+		if (
+			key.rightArrow ||
+			key.return ||
+			key.pageUp ||
+			input === 'n' ||
+			input === 'l' ||
+			input === ' '
+		) {
 			setCurrentSlide((slide) => Math.min(slide + 1, totalSlides - 1));
 		}
-		if (key.leftArrow || input === 'h') {
+		if (
+			key.leftArrow ||
+			key.pageDown ||
+			input === 'p' ||
+			input === 'N' ||
+			input === 'h'
+		) {
 			setCurrentSlide((slide) => Math.max(slide - 1, 0));
 		}
 		if (input === 'G') {
