@@ -1,0 +1,1 @@
+export { getUserFullName } from './os';
