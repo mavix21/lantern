@@ -16,10 +16,10 @@ export const useNavigation = ({
 	const { exit } = useApp();
 
 	useInput((input, key) => {
-		// Handle input here
 		if (input === 'q') {
 			exit();
 		}
+
 		if (
 			key.rightArrow ||
 			key.return ||
@@ -29,7 +29,9 @@ export const useNavigation = ({
 			input === ' '
 		) {
 			setCurrentSlide((slide) => Math.min(slide + 1, totalSlides - 1));
+			return;
 		}
+
 		if (
 			key.leftArrow ||
 			key.pageDown ||
@@ -38,10 +40,14 @@ export const useNavigation = ({
 			input === 'h'
 		) {
 			setCurrentSlide((slide) => Math.max(slide - 1, 0));
+			return;
 		}
+
 		if (input === 'G') {
 			setCurrentSlide(totalSlides - 1);
+			return;
 		}
+
 		if (input === 'g') {
 			if (timeoutRef.current) {
 				clearTimeout(timeoutRef.current);
