@@ -13,7 +13,8 @@ const ext = markedTerminal({
 	// chalk.bold (SGR 1) is often rendered as "bright intensity" rather than
 	// bold font-weight, making it invisible when the default foreground is
 	// already bright. Combine with whiteBright to guarantee contrast.
-	firstHeading: (text: string) => chalk.magentaBright.inverse(` ${text} `),
+	firstHeading: (text: string) => chalk.magentaBright.bold.inverse(` ${text} `),
+	heading: (text: string) => chalk.green.bold.inverse(` ${text} `),
 	strong: chalk.magenta.bold,
 	codespan: chalk.bgBlack.whiteBright,
 	tab: 2,
@@ -90,12 +91,13 @@ ext.renderer!.blockquote = function (quote: Tokens.Blockquote | string) {
 	const clean = (quote as string)
 		.replaceAll(BG_OPEN, '')
 		.replaceAll(BG_CLOSE, '');
+	const empty = bgLine(`${BAR} `, width);
 	const bordered = clean
 		.trim()
 		.split('\n')
 		.map((line: string) => bgLine(`${BAR} ${line.trimEnd()}`, width))
 		.join('\n');
-	return '\n' + bordered + '\n\n';
+	return '\n' + empty + '\n' + bordered + '\n' + empty + '\n\n';
 };
 
 // Add a dark background to fenced code blocks so they are visually
