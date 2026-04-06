@@ -1,6 +1,10 @@
-# lantern
+<p align="center">
+  <img src="./lantern.jpg" alt="lantern" width="280" />
+</p>
 
-Terminal based presentation tool
+<h1 align="center">Lantern</h1>
+
+<p align="center">Terminal based presentation tool</p>
 
 ## Installation
 
@@ -11,9 +15,9 @@ bun add lantern
 ## Usage
 
 ```typescript
-import { greet } from "lantern";
+import { greet } from 'lantern';
 
-console.log(greet("World")); // Hello, World!
+console.log(greet('World')); // Hello, World!
 ```
 
 ## Contributing
