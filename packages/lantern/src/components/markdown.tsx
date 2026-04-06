@@ -4,12 +4,17 @@ import { Marked } from 'marked';
 import { markedTerminal } from 'marked-terminal';
 import type { Tokens } from 'marked';
 import chalk from 'chalk';
+import {
+	useTerminalImages,
+	type ImageRef,
+} from '../hooks/use-terminal-images.js';
 
 type Props = {
 	children: string;
 	searchQuery?: string;
 	activeMatchIndex?: number | null;
 	paddingX?: number;
+	basePath?: string;
 };
 
 const ext = markedTerminal({
@@ -72,18 +77,31 @@ ext.renderer!.checkbox = function () {
 	return '';
 };
 
-// Fix: marked-terminal renders images as raw markdown syntax which is
-// indistinguishable from source text. Override to provide a styled,
-// terminal-friendly representation.
+// ── Image support ────────────────────────────────────────────────────
+// The image renderer emits a unique marker during parsing. A later step
+// replaces each marker with either a real terminal-rendered image (once
+// loaded asynchronously) or a styled placeholder while loading.
+const IMG_MARKER_PREFIX = '\x00IMG:';
+const IMG_MARKER_SUFFIX = '\x00';
+const IMG_MARKER_RE = /\x00IMG:(\d+)\x00/g;
+let imageRefs: ImageRef[] = [];
+
 ext.renderer!.image = function (token: Tokens.Image) {
-	const alt = token.text || 'image';
-	const href = token.href || '';
-	const title = token.title;
-	let out = chalk.yellow('🖼 : ') + chalk.italic(alt);
-	if (title) out += chalk.gray(' – ' + title);
-	if (href) out += chalk.red(' → ' + href);
-	return out;
+	const idx = imageRefs.length;
+	imageRefs.push({
+		href: token.href || '',
+		alt: token.text || 'image',
+		title: token.title,
+	});
+	return `${IMG_MARKER_PREFIX}${idx}${IMG_MARKER_SUFFIX}`;
 };
+
+function imagePlaceholder(ref: ImageRef): string {
+	let out = chalk.yellow('🖼 : ') + chalk.italic(ref.alt);
+	if (ref.title) out += chalk.gray(' – ' + ref.title);
+	if (ref.href) out += chalk.red(' → ' + ref.href);
+	return out;
+}
 
 // Fix: marked-terminal's section() appends \n\n to every list, including
 // nested ones. When a nested list sits inside a parent list-item the extra
@@ -272,6 +290,7 @@ export default function Markdown({
 	searchQuery,
 	activeMatchIndex,
 	paddingX = 0,
+	basePath = '.',
 }: Props): React.JSX.Element {
 	const { stdout } = useStdout();
 	const [columns, setColumns] = React.useState(stdout.columns || 80);
@@ -285,15 +304,35 @@ export default function Markdown({
 	}, [stdout]);
 
 	const width = columns - paddingX * 2;
+	const maxImageHeight = Math.max(1, Math.floor((stdout.rows || 24) * 0.5));
 
-	const rendered = React.useMemo(
-		() => (marked.parse(children) as string).trimEnd(),
-		[children],
+	// Step 1 — parse markdown, collecting image refs as side-effect.
+	const { parsed, refs } = React.useMemo(() => {
+		imageRefs = [];
+		const result = (marked.parse(children) as string).trimEnd();
+		return { parsed: result, refs: [...imageRefs] };
+	}, [children]);
+
+	// Step 2 — async load images in background.
+	const imageCache = useTerminalImages(refs, basePath, width, maxImageHeight);
+
+	// Step 3 — replace image markers with rendered images or placeholders.
+	const withImages = React.useMemo(
+		() =>
+			parsed.replace(IMG_MARKER_RE, (_, idxStr: string) => {
+				const idx = Number.parseInt(idxStr, 10);
+				const ref = refs[idx];
+				if (!ref) return '';
+				const cached = imageCache.get(ref.href);
+				if (cached) return '\n' + cached;
+				return imagePlaceholder(ref);
+			}),
+		[parsed, refs, imageCache],
 	);
 
 	const withBackgrounds = React.useMemo(
-		() => applyBackgrounds(rendered, width),
-		[rendered, width],
+		() => applyBackgrounds(withImages, width),
+		[withImages, width],
 	);
 
 	const highlighted = React.useMemo(

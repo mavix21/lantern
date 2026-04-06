@@ -43,6 +43,7 @@
 		"marked": "^17.0.6",
 		"marked-terminal": "^7.3.0",
 		"react": "^19.2.0",
+		"sharp": "^0.34.5",
 		"yargs": "^18.0.0"
 	},
 	"devDependencies": {

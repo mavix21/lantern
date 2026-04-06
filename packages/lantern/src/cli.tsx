@@ -72,7 +72,10 @@ async function main() {
 	// Enter alternate screen buffer (same as vim, htop, less, etc.)
 	process.stdout.write('\x1b[?1049h');
 
-	const instance = render(<App slides={slides} meta={meta} />);
+	const basePath = path.dirname(filePath);
+	const instance = render(
+		<App slides={slides} meta={meta} basePath={basePath} />,
+	);
 
 	// Watch for file changes and re-render
 	let debounce: NodeJS.Timeout;
@@ -81,7 +84,13 @@ async function main() {
 		debounce = setTimeout(async () => {
 			try {
 				const updated = await loadSlides(filePath);
-				instance.rerender(<App slides={updated.slides} meta={updated.meta} />);
+				instance.rerender(
+					<App
+						slides={updated.slides}
+						meta={updated.meta}
+						basePath={basePath}
+					/>,
+				);
 			} catch {
 				// Ignore transient read errors during saves
 			}

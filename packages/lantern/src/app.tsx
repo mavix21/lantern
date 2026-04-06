@@ -8,11 +8,16 @@ import type { Meta } from './meta';
 type Props = {
 	slides: string[];
 	meta: Meta;
+	basePath: string;
 };
 
 const PADDING_X = 4;
 
-export default function App({ slides, meta }: Props): React.JSX.Element {
+export default function App({
+	slides,
+	meta,
+	basePath,
+}: Props): React.JSX.Element {
 	const [currentSlide, setCurrentSlide] = React.useState(0);
 	const { stdout } = useStdout();
 
@@ -73,6 +78,7 @@ export default function App({ slides, meta }: Props): React.JSX.Element {
 						searchQuery={searchQuery}
 						activeMatchIndex={activeSlideMatchIndex}
 						paddingX={PADDING_X}
+						basePath={basePath}
 					>
 						{slides[currentSlide] ?? ''}
 					</Markdown>
