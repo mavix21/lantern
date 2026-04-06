@@ -2,7 +2,7 @@ import * as React from 'react';
 import { Box, Spacer, Text, useStdout } from 'ink';
 import Markdown from './components/markdown.js';
 import { useNavigation } from './hooks/use-navigation';
-import { useSearch } from './hooks/use-search';
+import { useAppMode } from './hooks/use-app-mode';
 import type { Meta } from './meta';
 
 type Props = {
@@ -10,41 +10,87 @@ type Props = {
 	meta: Meta;
 };
 
+const PADDING_X = 4;
+
 export default function App({ slides, meta }: Props): React.JSX.Element {
 	const [currentSlide, setCurrentSlide] = React.useState(0);
 	const { stdout } = useStdout();
 
 	const {
-		searchState,
+		mode,
 		searchQuery,
 		currentMatchIndex,
 		totalMatches,
 		activeSlideMatchIndex,
-	} = useSearch({ slides, currentSlide, setCurrentSlide });
+		notification,
+	} = useAppMode({
+		slides,
+		currentSlide,
+		setCurrentSlide,
+		totalSlides: slides.length,
+	});
 
 	useNavigation({
 		setCurrentSlide,
 		totalSlides: slides.length,
-		searchState,
+		modeKind: mode.kind,
 	});
 
 	return (
-		<Box flexDirection="column" height={stdout.rows} paddingX={4} paddingY={2}>
-			<Markdown
-				searchQuery={searchQuery}
-				activeMatchIndex={activeSlideMatchIndex}
-			>
-				{slides[currentSlide] ?? ''}
-			</Markdown>
-			<Spacer />
+		<Box
+			flexDirection="column"
+			height={stdout.rows}
+			paddingX={PADDING_X}
+			paddingY={2}
+		>
+			{mode.kind === 'go-to-slide' ? (
+				<>
+					<Spacer />
+					<Box justifyContent="center">
+						<Box
+							borderStyle="round"
+							borderColor="cyan"
+							flexDirection="column"
+							paddingX={2}
+						>
+							<Box justifyContent="center">
+								<Text bold color="cyan">
+									Go to slide
+								</Text>
+							</Box>
+							<Box>
+								<Text color="cyan">&gt; </Text>
+								<Text>{mode.input}</Text>
+								<Text color="gray">█</Text>
+							</Box>
+						</Box>
+					</Box>
+					<Spacer />
+				</>
+			) : (
+				<>
+					<Markdown
+						searchQuery={searchQuery}
+						activeMatchIndex={activeSlideMatchIndex}
+						paddingX={PADDING_X}
+					>
+						{slides[currentSlide] ?? ''}
+					</Markdown>
+					<Spacer />
+				</>
+			)}
 			<Box alignItems="center">
-				{searchState === 'searching' ? (
+				{notification ? (
+					<Box borderStyle="round" borderColor="red" paddingX={1}>
+						<Text color="red">{notification}</Text>
+					</Box>
+				) : mode.kind === 'searching' ? (
 					<Box>
 						<Text color="yellow">/</Text>
 						<Text>{searchQuery}</Text>
 						<Text color="gray">█</Text>
 					</Box>
-				) : searchState === 'confirmed' ? (
+				) : mode.kind === 'search-confirmed' ? (
 					<Box>
 						<Text color="yellow">/</Text>
 						<Text>{searchQuery}</Text>
