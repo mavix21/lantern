@@ -19,6 +19,41 @@ const ext = markedTerminal({
 	tab: 2,
 });
 
+// ── Background helpers ───────────────────────────────────────────────
+// Very dark background (ANSI 256-color 234 = #1c1c1c) for code blocks
+// and blockquotes so they stand out as distinct regions.
+const BG_OPEN = '\u001b[48;5;234m';
+const BG_CLOSE = '\u001b[49m';
+const APP_PADDING = 8; // paddingX={4} in app.tsx → 4 * 2
+
+// eslint-disable-next-line no-control-regex -- intentional: match ANSI SGR sequences
+const ANSI_RE = /\u001b\[[0-9;]*m/g;
+
+function visibleLength(str: string): number {
+	return str.replace(ANSI_RE, '').length;
+}
+
+function contentWidth(): number {
+	return (process.stdout.columns || 80) - APP_PADDING;
+}
+
+// Apply a dark background to `line`, padding it with spaces so the
+// background extends to `width`. Re-applies the BG code after every
+// SGR-reset (\u001b[0m) and after every BG-reset (\u001b[49m) so that
+// syntax-highlighting and nested blockquotes can't clear the background.
+function bgLine(line: string, width: number): string {
+	const pad = Math.max(0, width - visibleLength(line));
+	const padded = line + ' '.repeat(pad);
+	return (
+		BG_OPEN +
+		padded
+			.replaceAll('\u001b[0m', '\u001b[0m' + BG_OPEN)
+			.replaceAll(BG_CLOSE, BG_CLOSE + BG_OPEN) +
+		BG_CLOSE
+	);
+}
+
+// ── Renderer overrides ──────────────────────────────────────────────
 // Fix: marked-terminal's text renderer uses `token.text` (the raw string)
 // instead of parsing inline tokens, so bold, codespan, etc. inside tight
 // list items are never styled. Override it to call parseInline when tokens
@@ -42,18 +77,40 @@ ext.renderer!.checkbox = function () {
 
 // Fix: marked-terminal's blockquote renderer applies the styling function
 // to the entire text as one string, so a left-border prefix only appears
-// on the first line. Override the renderer to add a │ bar to every line.
+// on the first line. Override the renderer to add a │ bar to every line,
+// with a dark background that extends to the terminal width.
 const BAR = chalk.gray('│');
 ext.renderer!.blockquote = function (quote: Tokens.Blockquote | string) {
 	if (typeof quote === 'object') {
 		quote = this.parser.parse(quote.tokens);
 	}
-	const bordered = (quote as string)
+	const width = contentWidth();
+	// Strip background sequences from inner blockquotes / code blocks so
+	// we can apply a single uniform background across the whole blockquote.
+	const clean = (quote as string)
+		.replaceAll(BG_OPEN, '')
+		.replaceAll(BG_CLOSE, '');
+	const bordered = clean
 		.trim()
 		.split('\n')
-		.map((line: string) => `${BAR} ${line}`)
+		.map((line: string) => bgLine(`${BAR} ${line.trimEnd()}`, width))
 		.join('\n');
 	return '\n' + bordered + '\n\n';
+};
+
+// Add a dark background to fenced code blocks so they are visually
+// distinct from surrounding text and from each other.
+const origCode = ext.renderer!.code!;
+ext.renderer!.code = function (token: Tokens.Code) {
+	const result = origCode.call(this, token) as string;
+	const width = contentWidth();
+	const content = result.replace(/\n+$/, '');
+	const empty = bgLine('', width);
+	const lines = content
+		.split('\n')
+		.map((line: string) => bgLine(line, width))
+		.join('\n');
+	return empty + '\n' + lines + '\n' + empty + '\n\n';
 };
 
 const marked = new Marked(ext);
