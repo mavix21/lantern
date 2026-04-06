@@ -8,9 +8,9 @@
   <i align="center">A terminal-based presentation tool built with Node.js, Ink, Yargs, and Bun. Write your slides in Markdown, present them in the terminal. Lantern is heavily inspired by <code><a href="https://github.com/maaslalani/slides">slides</a></code>.</i>
 </p>
 
-
-https://github.com/user-attachments/assets/f5095076-69f3-4526-a52d-86b99b86bf43
-
+<p align="center">
+  <img src="./lantern.gif" alt="Lantern demo" width="600" />
+</p>
 
 ## ⚙️ Installation
 
