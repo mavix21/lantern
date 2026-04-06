@@ -5,6 +5,11 @@
 <h1 align="center" style="font-size: 3rem;">Lantern</h1>
 
 <p align="center">
+  <video src="https://github.com/mavix21/lantern/raw/main/lantern.mp4" width="600" controls autoplay loop muted>
+  </video>
+</p>
+
+<p align="center">
   <i align="center">A terminal-based presentation tool built with Node.js, Ink, Yargs, and Bun. Write your slides in Markdown, present them in the terminal. Lantern is heavily inspired by <code><a href="https://github.com/maaslalani/slides">slides</a></code>.</i>
 </p>
 
