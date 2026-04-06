@@ -86,6 +86,7 @@ ext.renderer!.checkbox = function () {
 // loaded asynchronously) or a styled placeholder while loading.
 const IMG_MARKER_PREFIX = '\x00IMG:';
 const IMG_MARKER_SUFFIX = '\x00';
+// oxlint-disable-next-line no-control-regex
 const IMG_MARKER_RE = /\x00IMG:(\d+)\x00/g;
 let imageRefs: ImageRef[] = [];
 
