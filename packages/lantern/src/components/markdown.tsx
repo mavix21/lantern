@@ -114,7 +114,8 @@ function applyBackgrounds(text: string, width: number): string {
 		.split('\n')
 		.map((line) => {
 			if (line.startsWith(BG_MARKER)) {
-				return bgLine(line.slice(BG_MARKER.length), width);
+				const content = line.slice(BG_MARKER.length).replaceAll('\t', '    ');
+				return bgLine(content, width);
 			}
 			return line;
 		})
