@@ -7,6 +7,8 @@ import chalk from 'chalk';
 
 type Props = {
 	children: string;
+	searchQuery?: string;
+	activeMatchIndex?: number | null;
 };
 
 const ext = markedTerminal({
@@ -117,11 +119,111 @@ ext.renderer!.code = function (token: Tokens.Code) {
 
 const marked = new Marked(ext);
 
-export default function Markdown({ children }: Props): React.JSX.Element {
+// ── Search highlighting ─────────────────────────────────────────────
+const HIGHLIGHT_OPEN = '\u001b[43m\u001b[30m';
+const ACTIVE_HIGHLIGHT_OPEN = '\u001b[48;5;208m\u001b[30m';
+const HIGHLIGHT_CLOSE = '\u001b[49m\u001b[39m';
+
+function highlightMatches(
+	text: string,
+	query: string,
+	activeMatchIndex: number | null,
+): string {
+	if (!query) return text;
+
+	const segments: Array<{ ansi: boolean; value: string }> = [];
+	const re = new RegExp(ANSI_RE.source, 'g');
+	let lastIndex = 0;
+	let m: RegExpExecArray | null;
+
+	while ((m = re.exec(text)) !== null) {
+		if (m.index > lastIndex) {
+			segments.push({ ansi: false, value: text.slice(lastIndex, m.index) });
+		}
+		segments.push({ ansi: true, value: m[0] });
+		lastIndex = re.lastIndex;
+	}
+	if (lastIndex < text.length) {
+		segments.push({ ansi: false, value: text.slice(lastIndex) });
+	}
+
+	const visibleText = segments
+		.filter((s) => !s.ansi)
+		.map((s) => s.value)
+		.join('');
+
+	const lowerVisible = visibleText.toLowerCase();
+	const lowerQuery = query.toLowerCase();
+
+	const ranges: Array<{ start: number; end: number; active: boolean }> = [];
+	let from = 0;
+	let matchIdx = 0;
+	while (from <= lowerVisible.length - lowerQuery.length) {
+		const idx = lowerVisible.indexOf(lowerQuery, from);
+		if (idx === -1) break;
+		ranges.push({
+			start: idx,
+			end: idx + lowerQuery.length,
+			active: matchIdx === activeMatchIndex,
+		});
+		matchIdx++;
+		from = idx + 1;
+	}
+
+	if (ranges.length === 0) return text;
+
+	let result = '';
+	let visibleIdx = 0;
+	let inHighlight = false;
+	let currentActive = false;
+
+	for (const seg of segments) {
+		if (seg.ansi) {
+			result += seg.value;
+			continue;
+		}
+		for (const ch of seg.value) {
+			const range = ranges.find(
+				(r) => visibleIdx >= r.start && visibleIdx < r.end,
+			);
+			const shouldHL = range !== undefined;
+			const isActive = range?.active ?? false;
+
+			if (shouldHL && (!inHighlight || currentActive !== isActive)) {
+				if (inHighlight) result += HIGHLIGHT_CLOSE;
+				result += isActive ? ACTIVE_HIGHLIGHT_OPEN : HIGHLIGHT_OPEN;
+				inHighlight = true;
+				currentActive = isActive;
+			} else if (!shouldHL && inHighlight) {
+				result += HIGHLIGHT_CLOSE;
+				inHighlight = false;
+			}
+			result += ch;
+			visibleIdx++;
+		}
+	}
+	if (inHighlight) result += HIGHLIGHT_CLOSE;
+
+	return result;
+}
+
+export default function Markdown({
+	children,
+	searchQuery,
+	activeMatchIndex,
+}: Props): React.JSX.Element {
 	const rendered = React.useMemo(
 		() => (marked.parse(children) as string).trimEnd(),
 		[children],
 	);
 
-	return <Text>{rendered}</Text>;
+	const highlighted = React.useMemo(
+		() =>
+			searchQuery
+				? highlightMatches(rendered, searchQuery, activeMatchIndex ?? null)
+				: rendered,
+		[rendered, searchQuery, activeMatchIndex],
+	);
+
+	return <Text>{highlighted}</Text>;
 }
