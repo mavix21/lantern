@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Text } from 'ink';
+import { Text, useStdout } from 'ink';
 import { Marked } from 'marked';
 import { markedTerminal } from 'marked-terminal';
 import type { Tokens } from 'marked';
@@ -9,6 +9,7 @@ type Props = {
 	children: string;
 	searchQuery?: string;
 	activeMatchIndex?: number | null;
+	paddingX?: number;
 };
 
 const ext = markedTerminal({
@@ -24,17 +25,13 @@ const ext = markedTerminal({
 // and blockquotes so they stand out as distinct regions.
 const BG_OPEN = '\u001b[48;5;234m';
 const BG_CLOSE = '\u001b[49m';
-const APP_PADDING = 8; // paddingX={4} in app.tsx → 4 * 2
+const BG_MARKER = '\x00BG\x00';
 
 // eslint-disable-next-line no-control-regex -- intentional: match ANSI SGR sequences
 const ANSI_RE = /\u001b\[[0-9;]*m/g;
 
 function visibleLength(str: string): number {
 	return str.replace(ANSI_RE, '').length;
-}
-
-function contentWidth(): number {
-	return (process.stdout.columns || 80) - APP_PADDING;
 }
 
 // Apply a dark background to `line`, padding it with spaces so the
@@ -84,17 +81,14 @@ ext.renderer!.blockquote = function (quote: Tokens.Blockquote | string) {
 	if (typeof quote === 'object') {
 		quote = this.parser.parse(quote.tokens);
 	}
-	const width = contentWidth();
-	// Strip background sequences from inner blockquotes / code blocks so
+	// Strip markers from inner blockquotes / code blocks so
 	// we can apply a single uniform background across the whole blockquote.
-	const clean = (quote as string)
-		.replaceAll(BG_OPEN, '')
-		.replaceAll(BG_CLOSE, '');
-	const empty = bgLine(`${BAR} `, width);
+	const clean = (quote as string).replaceAll(BG_MARKER, '');
+	const empty = BG_MARKER + `${BAR} `;
 	const bordered = clean
 		.trim()
 		.split('\n')
-		.map((line: string) => bgLine(`${BAR} ${line.trimEnd()}`, width))
+		.map((line: string) => BG_MARKER + `${BAR} ${line.trimEnd()}`)
 		.join('\n');
 	return '\n' + empty + '\n' + bordered + '\n' + empty + '\n\n';
 };
@@ -104,17 +98,28 @@ ext.renderer!.blockquote = function (quote: Tokens.Blockquote | string) {
 const origCode = ext.renderer!.code!;
 ext.renderer!.code = function (token: Tokens.Code) {
 	const result = origCode.call(this, token) as string;
-	const width = contentWidth();
 	const content = result.replace(/\n+$/, '');
-	const empty = bgLine('', width);
+	const empty = BG_MARKER;
 	const lines = content
 		.split('\n')
-		.map((line: string) => bgLine(line, width))
+		.map((line: string) => BG_MARKER + line)
 		.join('\n');
 	return empty + '\n' + lines + '\n' + empty + '\n\n';
 };
 
 const marked = new Marked(ext);
+
+function applyBackgrounds(text: string, width: number): string {
+	return text
+		.split('\n')
+		.map((line) => {
+			if (line.startsWith(BG_MARKER)) {
+				return bgLine(line.slice(BG_MARKER.length), width);
+			}
+			return line;
+		})
+		.join('\n');
+}
 
 // ── Search highlighting ─────────────────────────────────────────────
 const HIGHLIGHT_OPEN = '\u001b[43m\u001b[30m';
@@ -208,18 +213,41 @@ export default function Markdown({
 	children,
 	searchQuery,
 	activeMatchIndex,
+	paddingX = 0,
 }: Props): React.JSX.Element {
+	const { stdout } = useStdout();
+	const [columns, setColumns] = React.useState(stdout.columns || 80);
+
+	React.useEffect(() => {
+		const onResize = () => setColumns(stdout.columns || 80);
+		stdout.on('resize', onResize);
+		return () => {
+			stdout.off('resize', onResize);
+		};
+	}, [stdout]);
+
+	const width = columns - paddingX * 2;
+
 	const rendered = React.useMemo(
 		() => (marked.parse(children) as string).trimEnd(),
 		[children],
 	);
 
+	const withBackgrounds = React.useMemo(
+		() => applyBackgrounds(rendered, width),
+		[rendered, width],
+	);
+
 	const highlighted = React.useMemo(
 		() =>
 			searchQuery
-				? highlightMatches(rendered, searchQuery, activeMatchIndex ?? null)
-				: rendered,
-		[rendered, searchQuery, activeMatchIndex],
+				? highlightMatches(
+						withBackgrounds,
+						searchQuery,
+						activeMatchIndex ?? null,
+					)
+				: withBackgrounds,
+		[withBackgrounds, searchQuery, activeMatchIndex],
 	);
 
 	return <Text>{highlighted}</Text>;
