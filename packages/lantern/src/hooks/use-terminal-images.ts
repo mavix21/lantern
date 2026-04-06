@@ -18,16 +18,78 @@ export type CachedImage = {
 // ── Protocol detection ──────────────────────────────────────────────
 // Native protocols render at full pixel resolution inside the terminal.
 // Block characters are a universal fallback (~1px per column).
-// Exported so the Markdown component knows when to use direct stdout writes.
+//
+// ┌─ Kitty graphics protocol ────────────────────────────────────────┐
+// │ Kitty, Ghostty, WezTerm, Konsole (≥22.04), Contour, foot,       │
+// │ wayst, Rio, + any KDE terminal embedding Konsole (Yakuake,       │
+// │ Dolphin, Kate) detected via KONSOLE_VERSION env var.             │
+// └──────────────────────────────────────────────────────────────────┘
+// ┌─ iTerm2 inline images ───────────────────────────────────────────┐
+// │ iTerm2, mintty (Git Bash / Cygwin / MSYS2 on Windows), Tabby,   │
+// │ Warp                                                             │
+// └──────────────────────────────────────────────────────────────────┘
+// ┌─ Fallback (ANSI ▄ block characters) ─────────────────────────────┐
+// │ Alacritty, Terminal.app, GNOME Terminal, xterm, Windows Terminal, │
+// │ cmd.exe, PowerShell (ConHost), st, rxvt, Tilix, Terminator,      │
+// │ LXTerminal, MATE/Xfce/Pantheon Terminal, and others.             │
+// │ These terminals lack Kitty/iTerm2 image support — the block      │
+// │ renderer gives a usable (lower-res) experience everywhere.       │
+// └──────────────────────────────────────────────────────────────────┘
+//
+// Override: set LANTERN_IMAGE_PROTOCOL=kitty|iterm2|block to force a
+// specific renderer for any terminal not auto-detected above.
 export type ImageProtocol = 'iterm2' | 'kitty' | 'block';
 
 function detectProtocol(): ImageProtocol {
-	const tp = process.env['TERM_PROGRAM'] ?? '';
-	const lt = process.env['LC_TERMINAL'] ?? '';
-	const term = process.env['TERM'] ?? '';
-	if (term === 'xterm-kitty' || tp === 'ghostty') return 'kitty';
-	if (tp === 'iTerm.app' || tp === 'WezTerm' || lt === 'iTerm2')
+	// Explicit override — escape hatch for any terminal we don't detect.
+	const override = process.env['LANTERN_IMAGE_PROTOCOL'];
+	if (override === 'kitty' || override === 'iterm2' || override === 'block') {
+		return override;
+	}
+
+	const tp = (process.env['TERM_PROGRAM'] ?? '').toLowerCase();
+	const lt = (process.env['LC_TERMINAL'] ?? '').toLowerCase();
+	const term = (process.env['TERM'] ?? '').toLowerCase();
+
+	// ── Kitty graphics protocol — highest fidelity, preferred. ──────
+	if (
+		// Linux
+		term === 'xterm-kitty' || // Kitty
+		term === 'xterm-ghostty' || // Ghostty
+		term.startsWith('foot') || // foot / foot-extra
+		tp === 'kitty' ||
+		tp === 'ghostty' ||
+		tp === 'wezterm' || // cross-platform
+		tp === 'konsole' || // KDE Konsole
+		tp === 'contour' ||
+		tp === 'rio' ||
+		tp === 'wayst' ||
+		// KDE apps embedding Konsole's widget (Yakuake, Dolphin, Kate…)
+		// all set KONSOLE_VERSION even when TERM_PROGRAM differs.
+		!!process.env['KONSOLE_VERSION'] ||
+		// Kitty always sets KITTY_WINDOW_ID; catches wrappers/forks too.
+		!!process.env['KITTY_WINDOW_ID']
+	) {
+		return 'kitty';
+	}
+
+	// ── iTerm2 inline image protocol ────────────────────────────────
+	if (
+		// macOS
+		tp === 'iterm.app' ||
+		lt === 'iterm2' ||
+		// Windows (mintty powers Git Bash, MSYS2, Cygwin terminals)
+		tp === 'mintty' ||
+		// Cross-platform
+		tp === 'tabby' ||
+		tp === 'warpterminal'
+	) {
 		return 'iterm2';
+	}
+
+	// Everything else: Alacritty, Terminal.app, GNOME Terminal (VTE),
+	// xterm, Windows Terminal, ConHost (cmd/PowerShell), st, rxvt,
+	// Tilix, Terminator, etc. — uses ANSI block-character rendering.
 	return 'block';
 }
 
