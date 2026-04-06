@@ -72,14 +72,71 @@ ext.renderer!.checkbox = function () {
 	return '';
 };
 
+// Fix: marked-terminal renders images as raw markdown syntax which is
+// indistinguishable from source text. Override to provide a styled,
+// terminal-friendly representation.
+ext.renderer!.image = function (token: Tokens.Image) {
+	const alt = token.text || 'image';
+	const href = token.href || '';
+	const title = token.title;
+	let out = chalk.yellow('🖼 : ') + chalk.italic(alt);
+	if (title) out += chalk.gray(' – ' + title);
+	if (href) out += chalk.red(' → ' + href);
+	return out;
+};
+
+// Fix: marked-terminal's section() appends \n\n to every list, including
+// nested ones. When a nested list sits inside a parent list-item the extra
+// blank line survives indentation and appears as a visible gap between
+// sibling nested items. Additionally, chalk.reset (used by the listitem
+// transform) wraps each line of multi-line content, producing lines that
+// contain only whitespace + ANSI reset codes. After the outer list's
+// indentLines runs, these become indented visually-blank artifact lines.
+// We strip both the artifacts and trailing newlines from nested lists.
+let listDepth = 0;
+const origList = ext.renderer!.list!;
+ext.renderer!.list = function (token: Tokens.List) {
+	listDepth++;
+	const result = origList.call(this, token) as string;
+	listDepth--;
+	const cleaned = result
+		.split('\n')
+		.filter((line) => {
+			if (line === '') return true;
+			// oxlint-disable-next-line no-control-regex
+			if (/\u001b\[/.test(line)) {
+				const visible = line.replace(ANSI_RE, '').trim();
+				return visible.length > 0;
+			}
+			return true;
+		})
+		.join('\n');
+	if (listDepth > 0) {
+		return cleaned.replace(/\n+$/, '');
+	}
+	return cleaned;
+};
+
 // Fix: marked-terminal's blockquote renderer applies the styling function
 // to the entire text as one string, so a left-border prefix only appears
 // on the first line. Override the renderer to add a │ bar to every line,
 // with a dark background that extends to the terminal width.
 const BAR = chalk.gray('│');
+// Reset list depth before blockquote parsing so nested lists inside
+// blockquotes still get proper section spacing.
+const savedListDepth = () => {
+	const d = listDepth;
+	listDepth = 0;
+	return d;
+};
+const restoreListDepth = (d: number) => {
+	listDepth = d;
+};
 ext.renderer!.blockquote = function (quote: Tokens.Blockquote | string) {
 	if (typeof quote === 'object') {
+		const d = savedListDepth();
 		quote = this.parser.parse(quote.tokens);
+		restoreListDepth(d);
 	}
 	// Strip markers from inner blockquotes / code blocks so
 	// we can apply a single uniform background across the whole blockquote.
