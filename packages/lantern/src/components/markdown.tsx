@@ -12,9 +12,6 @@ type Props = {
 };
 
 const ext = markedTerminal({
-	// chalk.bold (SGR 1) is often rendered as "bright intensity" rather than
-	// bold font-weight, making it invisible when the default foreground is
-	// already bright. Combine with whiteBright to guarantee contrast.
 	firstHeading: (text: string) => chalk.magentaBright.bold.inverse(` ${text} `),
 	heading: (text: string) => chalk.green.bold.inverse(` ${text} `),
 	strong: chalk.magenta.bold,
