@@ -108,7 +108,11 @@ export default function App({ slides, meta }: Props): React.JSX.Element {
 				)}
 				<Spacer />
 				<Text color="blue">
-					Slide {currentSlide + 1} / {slides.length}
+					{meta.paging.trim() !== ''
+						? meta.paging
+								.replace('%d', String(currentSlide + 1))
+								.replace('%d', String(slides.length))
+						: `Slide ${currentSlide + 1} / ${slides.length}`}
 				</Text>
 			</Box>
 		</Box>
