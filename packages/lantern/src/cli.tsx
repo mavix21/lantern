@@ -2,6 +2,7 @@
 import { render } from 'ink';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
+import { watch } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import App from './app.js';
@@ -65,15 +66,31 @@ async function loadSlides(filePath: string) {
 
 async function main() {
 	const argv = await parseArgs();
-	const { slides, meta } = await loadSlides(argv.file as string);
+	const filePath = path.resolve(argv.file as string);
+	const { slides, meta } = await loadSlides(filePath);
 
 	// Enter alternate screen buffer (same as vim, htop, less, etc.)
 	process.stdout.write('\x1b[?1049h');
 
 	const instance = render(<App slides={slides} meta={meta} />);
 
+	// Watch for file changes and re-render
+	let debounce: NodeJS.Timeout;
+	const watcher = watch(filePath, () => {
+		clearTimeout(debounce);
+		debounce = setTimeout(async () => {
+			try {
+				const updated = await loadSlides(filePath);
+				instance.rerender(<App slides={updated.slides} meta={updated.meta} />);
+			} catch {
+				// Ignore transient read errors during saves
+			}
+		}, 50);
+	});
+
 	// Restore original screen on exit
 	instance.waitUntilExit().then(() => {
+		watcher.close();
 		process.stdout.write('\x1b[?1049l');
 	});
 }
