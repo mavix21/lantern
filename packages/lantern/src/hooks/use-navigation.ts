@@ -1,17 +1,17 @@
 import * as React from 'react';
 import { useApp, useInput } from 'ink';
-import type { SearchState } from './use-search';
+import type { AppMode } from './use-app-mode';
 
 type UseNavigationProps = {
 	setCurrentSlide: React.Dispatch<React.SetStateAction<number>>;
 	totalSlides: number;
-	searchState?: SearchState;
+	modeKind?: AppMode['kind'];
 };
 
 export const useNavigation = ({
 	setCurrentSlide,
 	totalSlides,
-	searchState = 'idle',
+	modeKind = 'idle',
 }: UseNavigationProps): void => {
 	const lastKeyRef = React.useRef('');
 	const timeoutRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -20,7 +20,7 @@ export const useNavigation = ({
 
 	useInput(
 		(input, key) => {
-			if (searchState === 'confirmed' && (input === 'n' || input === 'N')) {
+			if (modeKind === 'search-confirmed' && (input === 'n' || input === 'N')) {
 				return;
 			}
 
@@ -76,6 +76,6 @@ export const useNavigation = ({
 
 			lastKeyRef.current = '';
 		},
-		{ isActive: searchState !== 'searching' },
+		{ isActive: modeKind === 'idle' || modeKind === 'search-confirmed' },
 	);
 };
