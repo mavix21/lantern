@@ -9,7 +9,31 @@ import App from './app.js';
 import { parseMeta } from './meta/index.js';
 import { panic } from './error/index.js';
 
-const SLIDE_DELIMITER = '\n---\n';
+function splitSlides(content: string): string[] {
+	const lines = content.split('\n');
+	const slides: string[] = [];
+	let current: string[] = [];
+	let inCodeBlock = false;
+
+	for (const line of lines) {
+		if (line.startsWith('```')) {
+			inCodeBlock = !inCodeBlock;
+		}
+
+		if (!inCodeBlock && line === '---' && current.length > 0) {
+			slides.push(current.join('\n'));
+			current = [];
+		} else {
+			current.push(line);
+		}
+	}
+
+	if (current.length > 0) {
+		slides.push(current.join('\n'));
+	}
+
+	return slides;
+}
 
 const parseArgs = () =>
 	yargs(hideBin(process.argv))
@@ -55,7 +79,7 @@ async function loadSlides(filePath: string) {
 	raw = raw.replaceAll('\r', '');
 
 	const meta = parseMeta(raw);
-	const slides = meta.content.split(SLIDE_DELIMITER);
+	const slides = splitSlides(meta.content);
 
 	if (slides.every((s) => s.trim() === '')) {
 		panic('the file contains no slides');
