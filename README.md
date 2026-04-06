@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="./lantern.gif" alt="Lantern demo" width="600" />
+  <img src="./lantern.gif" alt="Lantern demo" width="800" />
 </p>
 
 ## ⚙️ Installation
