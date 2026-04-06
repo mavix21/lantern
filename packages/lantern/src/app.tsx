@@ -11,7 +11,8 @@ type Props = {
 	basePath: string;
 };
 
-const PADDING_X = 4;
+const APP_PADDING_X = 4;
+const APP_PADDING_Y = 2;
 
 export default function App({
 	slides,
@@ -45,8 +46,8 @@ export default function App({
 		<Box
 			flexDirection="column"
 			height={stdout.rows}
-			paddingX={PADDING_X}
-			paddingY={2}
+			paddingX={APP_PADDING_X}
+			paddingY={APP_PADDING_Y}
 		>
 			{mode.kind === 'go-to-slide' ? (
 				<>
@@ -77,7 +78,8 @@ export default function App({
 					<Markdown
 						searchQuery={searchQuery}
 						activeMatchIndex={activeSlideMatchIndex}
-						paddingX={PADDING_X}
+						paddingX={APP_PADDING_X}
+						paddingY={APP_PADDING_Y}
 						basePath={basePath}
 					>
 						{slides[currentSlide] ?? ''}

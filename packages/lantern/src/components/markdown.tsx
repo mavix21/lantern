@@ -6,7 +6,9 @@ import type { Tokens } from 'marked';
 import chalk from 'chalk';
 import {
 	useTerminalImages,
+	imageProtocol,
 	type ImageRef,
+	type CachedImage,
 } from '../hooks/use-terminal-images.js';
 
 type Props = {
@@ -14,6 +16,7 @@ type Props = {
 	searchQuery?: string;
 	activeMatchIndex?: number | null;
 	paddingX?: number;
+	paddingY?: number;
 	basePath?: string;
 };
 
@@ -290,6 +293,7 @@ export default function Markdown({
 	searchQuery,
 	activeMatchIndex,
 	paddingX = 0,
+	paddingY = 0,
 	basePath = '.',
 }: Props): React.JSX.Element {
 	const { stdout } = useStdout();
@@ -317,18 +321,49 @@ export default function Markdown({
 	const imageCache = useTerminalImages(refs, basePath, width, maxImageHeight);
 
 	// Step 3 — replace image markers with rendered images or placeholders.
-	const withImages = React.useMemo(
-		() =>
-			parsed.replace(IMG_MARKER_RE, (_, idxStr: string) => {
+	// For native protocols (Kitty/iTerm2), also collect rawData + row
+	// positions so we can write them directly to stdout in a useEffect.
+	const { withImages, nativeImages } = React.useMemo(() => {
+		const natives: Array<{ row: number; data: string }> = [];
+		const result = parsed.replace(
+			IMG_MARKER_RE,
+			(_, idxStr: string, offset: number) => {
 				const idx = Number.parseInt(idxStr, 10);
 				const ref = refs[idx];
 				if (!ref) return '';
-				const cached = imageCache.get(ref.href);
-				if (cached) return '\n' + cached;
+				const cached: CachedImage | undefined = imageCache.get(ref.href);
+				if (cached) {
+					if (cached.rawData) {
+						const before = parsed.slice(0, offset);
+						const row = (before.match(/\n/g) || []).length;
+						natives.push({ row: row + 1, data: cached.rawData });
+					}
+					return '\n' + cached.text;
+				}
 				return imagePlaceholder(ref);
-			}),
-		[parsed, refs, imageCache],
-	);
+			},
+		);
+		return { withImages: result, nativeImages: natives };
+	}, [parsed, refs, imageCache]);
+
+	// Step 3b — write native protocol image data directly to stdout.
+	// This bypasses ink's text processing which would corrupt the long
+	// escape sequences. We use absolute cursor positioning so the image
+	// lands on the correct row, then restore the cursor.
+	React.useEffect(() => {
+		if (nativeImages.length === 0) return;
+		// Delete any previous Kitty images on screen before drawing new ones.
+		if (imageProtocol === 'kitty') {
+			process.stdout.write('\x1b_Ga=d\x1b\\');
+		}
+		for (const img of nativeImages) {
+			const absRow = paddingY + img.row + 1; // 1-indexed for ANSI
+			process.stdout.write('\x1b7'); // save cursor
+			process.stdout.write(`\x1b[${absRow};${paddingX + 1}H`); // move
+			process.stdout.write(img.data); // write image data
+			process.stdout.write('\x1b8'); // restore cursor
+		}
+	}, [nativeImages, paddingX, paddingY]);
 
 	const withBackgrounds = React.useMemo(
 		() => applyBackgrounds(withImages, width),

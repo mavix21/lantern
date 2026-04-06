@@ -10,10 +10,16 @@ export type ImageRef = {
 	title: string | null;
 };
 
+export type CachedImage = {
+	text: string;
+	rawData?: string;
+};
+
 // ── Protocol detection ──────────────────────────────────────────────
 // Native protocols render at full pixel resolution inside the terminal.
 // Block characters are a universal fallback (~1px per column).
-type ImageProtocol = 'iterm2' | 'kitty' | 'block';
+// Exported so the Markdown component knows when to use direct stdout writes.
+export type ImageProtocol = 'iterm2' | 'kitty' | 'block';
 
 function detectProtocol(): ImageProtocol {
 	const tp = process.env['TERM_PROGRAM'] ?? '';
@@ -25,24 +31,23 @@ function detectProtocol(): ImageProtocol {
 	return 'block';
 }
 
-const protocol = detectProtocol();
+export const imageProtocol: ImageProtocol = detectProtocol();
 
 // ── iTerm2 inline image protocol ────────────────────────────────────
-// Embeds base64-encoded image data in an OSC escape sequence.
-// The terminal renders at full pixel resolution within the cell area.
+// Returns spacer newlines as `text` (for ink layout) and the raw OSC
+// escape sequence as `rawData` (written directly to stdout by the
+// component, bypassing ink's text wrapping which would corrupt it).
 async function renderITerm2(
 	filePath: string,
 	maxCols: number,
 	maxRows: number,
-): Promise<string> {
+): Promise<CachedImage> {
 	const [fileBuffer, meta] = await Promise.all([
 		readFile(filePath),
 		sharp(filePath).metadata(),
 	]);
 	if (!meta.width || !meta.height) throw new Error('unreadable image');
 
-	// Estimate how many terminal rows the image will occupy so we can
-	// pad with newlines for ink's layout. Cells are roughly 1:2 (w:h).
 	const imgAspect = meta.height / meta.width;
 	const estimatedRows = Math.min(
 		maxRows,
@@ -50,23 +55,22 @@ async function renderITerm2(
 	);
 
 	const b64 = fileBuffer.toString('base64');
-	const esc =
-		`\x1b]1337;File=inline=1;width=${maxCols};height=${estimatedRows}` +
+	const rawData =
+		`\x1b]1337;File=inline=1;height=${estimatedRows}` +
 		`;preserveAspectRatio=1;size=${fileBuffer.length}:${b64}\x07`;
 
-	// Ink counts lines via \n. Pad so content below the image starts
-	// after the image area.
-	const spacer = '\n'.repeat(Math.max(0, estimatedRows - 1));
-	return esc + spacer;
+	const text = '\n'.repeat(estimatedRows);
+	return { text, rawData };
 }
 
 // ── Kitty graphics protocol ─────────────────────────────────────────
-// Sends a PNG-encoded image in chunked APC escape sequences.
+// Returns spacer newlines as `text` and chunked APC escape sequences as
+// `rawData` for direct stdout write.
 async function renderKitty(
 	filePath: string,
 	maxCols: number,
 	maxRows: number,
-): Promise<string> {
+): Promise<CachedImage> {
 	const meta = await sharp(filePath).metadata();
 	if (!meta.width || !meta.height) throw new Error('unreadable image');
 
@@ -76,25 +80,24 @@ async function renderKitty(
 		Math.max(1, Math.ceil((maxCols * imgAspect) / 2)),
 	);
 
-	// Convert to PNG (required by Kitty f=100).
 	const pngBuffer = await sharp(filePath).png().toBuffer();
 	const b64 = pngBuffer.toString('base64');
 
-	let result = '';
+	let rawData = '';
 	const chunkSize = 4096;
 	for (let i = 0; i < b64.length; i += chunkSize) {
 		const chunk = b64.slice(i, i + chunkSize);
 		const isFirst = i === 0;
 		const isLast = i + chunkSize >= b64.length;
 		if (isFirst) {
-			result += `\x1b_Gf=100,a=T,c=${maxCols},r=${estimatedRows},m=${isLast ? 0 : 1};${chunk}\x1b\\`;
+			rawData += `\x1b_Gf=100,a=T,r=${estimatedRows},m=${isLast ? 0 : 1};${chunk}\x1b\\`;
 		} else {
-			result += `\x1b_Gm=${isLast ? 0 : 1};${chunk}\x1b\\`;
+			rawData += `\x1b_Gm=${isLast ? 0 : 1};${chunk}\x1b\\`;
 		}
 	}
 
-	const spacer = '\n'.repeat(Math.max(0, estimatedRows - 1));
-	return result + spacer;
+	const text = '\n'.repeat(estimatedRows);
+	return { text, rawData };
 }
 
 // ── Block-character fallback ────────────────────────────────────────
@@ -107,7 +110,7 @@ async function renderBlock(
 	filePath: string,
 	maxCols: number,
 	maxRows: number,
-): Promise<string> {
+): Promise<CachedImage> {
 	const image = sharp(filePath);
 	const meta = await image.metadata();
 	if (!meta.width || !meta.height) throw new Error('unreadable image');
@@ -141,7 +144,7 @@ async function renderBlock(
 		lines.push(line);
 	}
 
-	return lines.join('\n');
+	return { text: lines.join('\n') };
 }
 
 // ── Unified renderer ────────────────────────────────────────────────
@@ -149,28 +152,29 @@ async function renderImage(
 	filePath: string,
 	maxCols: number,
 	maxRows: number,
-): Promise<string> {
-	if (protocol === 'iterm2') return renderITerm2(filePath, maxCols, maxRows);
-	if (protocol === 'kitty') return renderKitty(filePath, maxCols, maxRows);
+): Promise<CachedImage> {
+	if (imageProtocol === 'iterm2')
+		return renderITerm2(filePath, maxCols, maxRows);
+	if (imageProtocol === 'kitty') return renderKitty(filePath, maxCols, maxRows);
 	return renderBlock(filePath, maxCols, maxRows);
 }
 
 // Global cache so images persist across slide navigation and re-renders.
-const globalCache = new Map<string, string>();
+const globalCache = new Map<string, CachedImage>();
 
 /**
  * Asynchronously loads and renders images referenced in markdown slides.
  * Uses native terminal image protocols (iTerm2, Kitty) when available for
  * full pixel-quality rendering, falling back to ANSI block characters.
- * Returns a map of `href → rendered string`.
+ * Returns a map of `href → CachedImage`.
  */
 export function useTerminalImages(
 	refs: ImageRef[],
 	basePath: string,
 	width: number,
 	maxHeight: number,
-): Map<string, string> {
-	const [cache, setCache] = React.useState<Map<string, string>>(
+): Map<string, CachedImage> {
+	const [cache, setCache] = React.useState<Map<string, CachedImage>>(
 		() => new Map(globalCache),
 	);
 
@@ -199,8 +203,7 @@ export function useTerminalImages(
 					const rendered = await renderImage(resolved, width, maxHeight);
 					globalCache.set(href, rendered);
 				} catch {
-					// Mark as failed so we don't retry every render.
-					globalCache.set(href, '');
+					globalCache.set(href, { text: '' });
 				}
 			}
 
