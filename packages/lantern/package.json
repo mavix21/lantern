@@ -40,7 +40,7 @@
 	"dependencies": {
 		"gray-matter": "^4.0.3",
 		"ink": "^6.8.0",
-		"marked": "^17.0.6",
+		"marked": "^15.0.12",
 		"marked-terminal": "^7.3.0",
 		"react": "^19.2.0",
 		"sharp": "^0.34.5",

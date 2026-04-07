@@ -71,11 +71,12 @@ ext.renderer!.text = function (token: Tokens.Text | Tokens.Escape) {
 	return origText.call(this, token);
 };
 
-// Fix: in marked v17, list item tokens include a `checkbox` token that the
+// Fix: in marked v17+, list item tokens include a `checkbox` token that the
 // parser renders via the extension. But marked-terminal's listitem() also
 // prepends a checkbox by calling r.checkbox() directly on the prototype,
 // causing duplication. Neutralise the extension-level checkbox renderer so
 // only the manual one from listitem() survives.
+// (Harmless no-op on marked v15 where the checkbox token isn't emitted.)
 ext.renderer!.checkbox = function () {
 	return '';
 };
