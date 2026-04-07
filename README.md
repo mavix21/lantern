@@ -15,7 +15,7 @@
 ## ⚙️ Installation
 
 ```bash
-bun add lantern
+npm i -g @mavix21/lantern
 ```
 
 ## 📦 Technologies
