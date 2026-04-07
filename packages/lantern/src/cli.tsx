@@ -69,6 +69,13 @@ async function loadSlides(filePath: string) {
 		panic(`not a file: ${resolved}`);
 	}
 
+	const markdownExtensions = new Set(['.md', '.mdx', '.markdown']);
+	const extension = path.extname(resolved).toLowerCase();
+
+	if (!markdownExtensions.has(extension)) {
+		panic(`file must be a markdown file (.md, .mdx, .markdown): ${resolved}`);
+	}
+
 	let raw: string;
 	try {
 		raw = await readFile(resolved, 'utf-8');
