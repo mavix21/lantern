@@ -1,6 +1,6 @@
 {
 	"name": "@mavix21/lantern",
-	"version": "0.1.4",
+	"version": "0.1.5",
 	"description": "Terminal based presentation tool",
 	"homepage": "https://github.com/mavix21/lantern/tree/main/packages/lantern#readme",
 	"license": "MIT",
