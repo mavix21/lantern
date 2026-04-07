@@ -1,3 +1,2 @@
-export function greet(name: string): string {
-	return `Hello, ${name}! Welcome to the lantern package.`;
-}
+// Empty export to satisfy Bun's module system
+export {};
